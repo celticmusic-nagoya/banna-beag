@@ -77,6 +77,7 @@ jobs:
               assert(await page.evaluate(async()=>{const i=new Image();i.src='assets/hero-session-mobile.webp';await i.decode();return i.naturalWidth>0}));
               for(const id of ['about','session','events','join'])assert.equal(await page.locator('#'+id).count(),1);
               assert.equal(await page.locator('time').count(),2);
+              assert(await page.locator('.event-poster img').evaluate(async i=>{i.loading='eager';await i.decode();return i.naturalWidth>0}));
               await page.locator('#gallery').scrollIntoViewIfNeeded();
               await page.locator('#gallery img').evaluateAll(imgs=>Promise.all(imgs.map(i=>{i.loading='eager';return i.decode()})));
               assert.equal(await page.locator('#gallery img').count(),4);
@@ -96,10 +97,10 @@ jobs:
       - name: Assemble release candidate without publishing
         run: |
           mkdir -p release/assets
-          cp index.html style.css robots.txt sitemap.xml release/
+          cp index.html style.css robots.txt sitemap.xml christmas-2026.webp release/
           cp assets/*.webp release/assets/
           cd release
-          sha256sum index.html style.css robots.txt sitemap.xml assets/*.webp > SHA256SUMS.txt
+          sha256sum index.html style.css robots.txt sitemap.xml christmas-2026.webp assets/*.webp > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: release-candidate
