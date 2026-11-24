@@ -85,3 +85,15 @@ jobs:
           name: release-candidate
           path: release/
           if-no-files-found: error
+
+      - name: Lighthouse mobile audit
+        run: |
+          mkdir -p lighthouse
+          python3 -m http.server 8766 --directory release &
+          npx --yes lighthouse@12.6.0 http://localhost:8766/ --chrome-flags="--headless --no-sandbox" --output=json --output-path=lighthouse/mobile.json --only-categories=performance,accessibility,best-practices,seo
+          node -e 'const r=require("./lighthouse/mobile.json");for(const [k,v] of Object.entries(r.categories))console.log(k,Math.round(v.score*100))'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-report
+          path: lighthouse/
