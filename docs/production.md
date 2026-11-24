@@ -1,0 +1,2 @@
+# Banna Beag initial website
+Independent community site. Forest, linen, amber palette; Japanese first, English supporting. No unverified photos, social URLs or membership requirements. Upcoming events before archives. Christmas dates from organizer correspondence; verify before release. Pending: official photos, contact links, session participation details, SEO canonical and schema after public URL confirmation, browser QA. No main merge or Pages publication until approved.
