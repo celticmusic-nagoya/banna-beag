@@ -11,6 +11,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Verify approved photo assets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ['hero-session','community','street-performance','festival','outdoor-community']:
+              p=Path('assets')/(name+'.webp')
+              assert p.is_file(), f'Missing approved image: {p}'
+              data=p.read_bytes()
+              assert data[:4]==b'RIFF' and data[8:12]==b'WEBP', f'Invalid WebP: {p}'
+          PY
       - run: npm install --no-save playwright@1.51.1
       - run: npx playwright install --with-deps chromium
       - run: |
@@ -29,6 +39,9 @@ jobs:
               assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
               for(const id of ['about','session','events','join'])assert.equal(await page.locator('#'+id).count(),1);
               assert.equal(await page.locator('time').count(),2);
+              await page.locator('#gallery').scrollIntoViewIfNeeded();
+              await page.locator('#gallery img').evaluateAll(imgs=>Promise.all(imgs.map(i=>{i.loading='eager';return i.decode()})));
+              assert.equal(await page.locator('#gallery img').count(),4);
               assert.equal(errors.length,0);
               await page.screenshot({path:'screenshots/home-'+width+'.png',fullPage:true});
               await page.close();
