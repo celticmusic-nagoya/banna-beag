@@ -51,6 +51,9 @@ jobs:
               const response=await page.goto('http://localhost:8765/');
               assert.equal(response.status(),200);
               assert.equal(await page.locator('h1').count(),1);
+              const hero=await page.request.get('http://localhost:8765/assets/hero-session.webp');
+              assert.equal(hero.status(),200);
+              assert(await page.evaluate(async()=>{const i=new Image();i.src='assets/hero-session.webp';await i.decode();return i.naturalWidth>0}));
               assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
               for(const id of ['about','session','events','join'])assert.equal(await page.locator('#'+id).count(),1);
               assert.equal(await page.locator('time').count(),2);
@@ -69,3 +72,16 @@ jobs:
         with:
           name: browser-screenshots
           path: screenshots/
+
+      - name: Assemble release candidate without publishing
+        run: |
+          mkdir -p release/assets
+          cp index.html style.css robots.txt sitemap.xml release/
+          cp assets/*.webp release/assets/
+          cd release
+          sha256sum index.html style.css robots.txt sitemap.xml assets/*.webp > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate
+          path: release/
+          if-no-files-found: error
