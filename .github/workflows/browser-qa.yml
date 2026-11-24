@@ -26,6 +26,25 @@ jobs:
                   p.parent.mkdir(exist_ok=True)
                   p.write_bytes(z.read(matches[0]))
           PY
+      - name: Generate mobile hero derivative
+        run: |
+          python3 -m pip install --user Pillow==11.3.0
+          python3 - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          p=Path('assets/hero-session.webp')
+          with Image.open(p) as im:
+              im.thumbnail((960,960), Image.Resampling.LANCZOS)
+              im.save('assets/hero-session-mobile.webp',quality=78,method=6)
+          print('Hero bytes:',p.stat().st_size,Path('assets/hero-session-mobile.webp').stat().st_size)
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('style.css')
+          p.write_text(p.read_text()+'\n@media(max-width:700px){.photo-hero{background-image:linear-gradient(90deg,rgba(20,39,25,.85),rgba(20,39,25,.12)),url("assets/hero-session-mobile.webp")}}\n')
+          p=Path('index.html')
+          p.write_text(p.read_text().replace('<link rel="preload" as="image" href="assets/hero-session.webp" fetchpriority="high">','<link rel="preload" as="image" href="assets/hero-session.webp" media="(min-width:701px)" fetchpriority="high"><link rel="preload" as="image" href="assets/hero-session-mobile.webp" media="(max-width:700px)" fetchpriority="high">'))
+          PY
       - name: Verify approved photo assets
         run: |
           python3 - <<'PY'
@@ -55,6 +74,7 @@ jobs:
               assert.equal(hero.status(),200);
               assert(await page.evaluate(async()=>{const i=new Image();i.src='assets/hero-session.webp';await i.decode();return i.naturalWidth>0}));
               assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+              assert(await page.evaluate(async()=>{const i=new Image();i.src='assets/hero-session-mobile.webp';await i.decode();return i.naturalWidth>0}));
               for(const id of ['about','session','events','join'])assert.equal(await page.locator('#'+id).count(),1);
               assert.equal(await page.locator('time').count(),2);
               await page.locator('#gallery').scrollIntoViewIfNeeded();
