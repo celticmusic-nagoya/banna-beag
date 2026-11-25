@@ -40,3 +40,10 @@ body{background:#f5f3e9;color:#263e30}header{max-width:1440px;margin:auto;paddin
 @media(max-width:700px){#session,#events .event{display:block}#session h2{margin:.3em 0 .5em}#events .event a{display:inline-block}#gallery figure:nth-child(even){margin-top:0}}
 
 #events .event-feature{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:clamp(1.5rem,5vw,5rem);align-items:center}#events .event-poster{margin:0}#events .event-poster img{display:block;width:100%;height:auto}#events .event{display:block}#events .event p:has(time){font-size:1.05rem}#events .event a{display:inline-block;margin-top:1rem}#gallery figcaption::after{content:none}@media(max-width:700px){#events .event-feature{grid-template-columns:1fr}#events .event-poster{max-width:440px;margin:auto}}
+
+/* Recording card: keyboard and pointer affordances */
+#session .session-listen a{border-radius:2px;transition:background-color .2s ease}
+#session .session-listen a:focus-visible{outline:3px solid currentColor;outline-offset:6px}
+#session .session-listen a:hover h3{text-decoration:underline;text-underline-offset:.2em}
+#session .session-listen img{border-radius:2px}
+@media(prefers-reduced-motion:reduce){#session .session-listen a{transition:none}}
