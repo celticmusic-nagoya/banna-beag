@@ -28,6 +28,16 @@ jobs:
                   p.parent.mkdir(exist_ok=True)
                   p.write_bytes(z.read(matches[0]))
           PY
+      - name: Generate privacy-reviewed photo candidates
+        run: |
+          python3 -m pip install --user Pillow==11.3.0 opencv-python-headless==4.11.0.86
+          python3 scripts/privacy_photos.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: privacy-review
+          path: |
+            privacy-review.json
+            assets/*.webp
       - name: Generate mobile hero derivative
         run: |
           python3 -m pip install --user Pillow==11.3.0
