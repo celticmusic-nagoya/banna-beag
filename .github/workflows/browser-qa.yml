@@ -1,0 +1,149 @@
+name: Browser QA
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare approved photo assets from uploaded archive
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          names=['hero-session','community','street-performance','festival','outdoor-community']
+          with zipfile.ZipFile('banna-beag-optimized-images.zip') as z:
+              for name in names:
+                  matches=[i for i in z.infolist() if Path(i.filename).name==name+'.webp']
+                  assert len(matches)==1, (name,len(matches))
+                  assert matches[0].file_size < 5000000
+                  p=Path('assets')/(name+'.webp')
+                  p.parent.mkdir(exist_ok=True)
+                  p.write_bytes(z.read(matches[0]))
+          PY
+      - name: Generate mobile hero derivative
+        run: |
+          python3 -m pip install --user Pillow==11.3.0
+          python3 - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          p=Path('assets/hero-session.webp')
+          with Image.open(p) as im:
+              im.thumbnail((960,960), Image.Resampling.LANCZOS)
+              im.save('assets/hero-session-mobile.webp',quality=78,method=6)
+          print('Hero bytes:',p.stat().st_size,Path('assets/hero-session-mobile.webp').stat().st_size)
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('style.css')
+          p.write_text(p.read_text()+'\n@media(max-width:700px){.photo-hero{background-image:linear-gradient(90deg,rgba(20,39,25,.85),rgba(20,39,25,.12)),url("assets/hero-session-mobile.webp")}}\n')
+          p=Path('index.html')
+          p.write_text(p.read_text().replace('<link rel="preload" as="image" href="assets/hero-session.webp" fetchpriority="high">','<link rel="preload" as="image" href="assets/hero-session.webp" media="(min-width:701px)" fetchpriority="high"><link rel="preload" as="image" href="assets/hero-session-mobile.webp" media="(max-width:700px)" fetchpriority="high">'))
+          PY
+      - name: Verify approved photo assets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ['hero-session','community','street-performance','festival','outdoor-community']:
+              p=Path('assets')/(name+'.webp')
+              assert p.is_file(), f'Missing approved image: {p}'
+              data=p.read_bytes()
+              assert data[:4]==b'RIFF' and data[8:12]==b'WEBP', f'Invalid WebP: {p}'
+          PY
+      - run: npm install --no-save playwright@1.51.1
+      - run: npx playwright install --with-deps chromium
+      - run: |
+          python3 -m http.server 8765 &
+          node <<'JS'
+          const {chromium}=require('playwright');
+          const assert=require('node:assert/strict');
+          (async()=>{
+            const browser=await chromium.launch();
+            for(const width of [320,390,768,1440]){
+              const page=await browser.newPage({viewport:{width,height:900}});
+              const errors=[];page.on('pageerror',e=>errors.push(e.message));
+              const response=await page.goto('http://localhost:8765/');
+              assert.equal(response.status(),200);
+              assert.equal(await page.locator('h1').count(),1);
+              const hero=await page.request.get('http://localhost:8765/assets/hero-session.webp');
+              assert.equal(hero.status(),200);
+              assert(await page.evaluate(async()=>{const i=new Image();i.src='assets/hero-session.webp';await i.decode();return i.naturalWidth>0}));
+              assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+              assert(await page.evaluate(async()=>{const i=new Image();i.src='assets/hero-session-mobile.webp';await i.decode();return i.naturalWidth>0}));
+              for(const id of ['about','session','events','join'])assert.equal(await page.locator('#'+id).count(),1);
+              assert.equal(await page.locator('time').count(),2);
+              assert(await page.locator('.event-poster img').evaluate(async i=>{i.loading='eager';await i.decode();return i.naturalWidth>0}));
+              await page.locator('#gallery').scrollIntoViewIfNeeded();
+              await page.locator('#gallery img').evaluateAll(imgs=>Promise.all(imgs.map(i=>{i.loading='eager';return i.decode()})));
+              assert.equal(await page.locator('#gallery img').count(),4);
+              const recording=page.locator('#session .session-listen a');
+              assert.equal(await recording.count(),1);
+              assert.equal(await recording.getAttribute('href'),'https://www.youtube.com/watch?v=06sAeyREbvc');
+              assert(await recording.locator('img').evaluate(async i=>{i.loading='eager';await i.decode();return i.naturalWidth>0}));
+              assert.equal(errors.length,0);
+              await page.screenshot({path:'screenshots/home-'+width+'.png',fullPage:true});
+              await page.close();
+            }
+            await browser.close();
+          })().catch(e=>{console.error(e);process.exit(1)});
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-screenshots
+          path: screenshots/
+
+      - name: Assemble release candidate without publishing
+        run: |
+          mkdir -p release/assets
+          cp index.html style.css robots.txt sitemap.xml christmas-2026.webp release/
+          cp assets/*.webp release/assets/
+          cd release
+          sha256sum index.html style.css robots.txt sitemap.xml christmas-2026.webp assets/*.webp > SHA256SUMS.txt
+      - name: Verify release integrity
+        run: |
+          cd release
+          sha256sum -c SHA256SUMS.txt
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urlsplit
+          class Check(HTMLParser):
+              def handle_starttag(self, tag, attrs):
+                  a=dict(attrs)
+                  for key in ('src','href'):
+                      value=a.get(key,'')
+                      u=urlsplit(value)
+                      if not value or u.scheme or u.netloc or not u.path or u.path.startswith('/'):
+                          continue
+                      target=Path(u.path).resolve()
+                      assert target.is_relative_to(Path.cwd()), value
+                      if target.is_dir():
+                          target=target/'index.html'
+                      assert target.is_file(), value
+          Check().feed(Path('index.html').read_text())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-candidate
+          path: release/
+          if-no-files-found: error
+
+      - name: Lighthouse mobile audit
+        run: |
+          mkdir -p lighthouse
+          python3 -m http.server 8766 --directory release &
+          npx --yes lighthouse@12.6.0 http://localhost:8766/ --chrome-flags="--headless --no-sandbox" --output=json --output-path=lighthouse/mobile.json --only-categories=performance,accessibility,best-practices,seo
+          node -e 'const r=require("./lighthouse/mobile.json");for(const [k,v] of Object.entries(r.categories))console.log(k,Math.round(v.score*100))'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-report
+          path: lighthouse/
