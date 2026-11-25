@@ -44,6 +44,13 @@ jobs:
                   report['official_post_access']=type(e).__name__
           Path('candidates/source.json').write_text(json.dumps(report,indent=2))
           PY
+      - name: Verify extraction engine with isolated synthetic test
+        run: |
+          mkdir -p /tmp/frame-test
+          ffmpeg -nostdin -v error -f lavfi -i testsrc2=size=640x360:rate=24 -t 7 -c:v mpeg4 /tmp/frame-test/test.mp4
+          ffmpeg -nostdin -v error -i /tmp/frame-test/test.mp4 -vf 'fps=1/3,scale=1280:-2' -frames:v 24 -q:v 3 /tmp/frame-test/frame-%03d.jpg
+          test "$(find /tmp/frame-test -name 'frame-*.jpg' | wc -l)" -ge 2
+          rm -rf /tmp/frame-test
       - name: Extract review frames
         run: |
           if [ -f source-video ]; then
