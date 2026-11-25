@@ -75,3 +75,6 @@ body{background:#f5f3e9;color:#263e30}header{max-width:1440px;margin:auto;paddin
 
 /* Session editorial photograph: reserve geometry before lazy loading. */
 #session .session-visual{margin:1.5rem 0 0;min-width:0}#session .session-visual img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;background:#dce3c5}#session .session-visual figcaption{display:flex;justify-content:space-between;flex-wrap:wrap;gap:.4rem;font-size:.72rem;letter-spacing:.08em;padding:.6rem 0;border-bottom:1px solid #71866a}#session .session-visual figcaption span{letter-spacing:0}@media(min-width:701px){#session h2{grid-row:2;grid-column:1}#session .session-visual{grid-column:1;grid-row:3/5}#session>.session-listen{grid-column:1/-1;grid-row:5;max-width:none}#session .session-intro{grid-row:2;grid-column:2}#session .columns{grid-row:3/5;grid-column:2}}
+
+/* Three distinct documentary moments; avoid repeating the session photograph. */
+@media(min-width:701px){#gallery .gallery{grid-template-columns:repeat(3,minmax(0,1fr))}#gallery .gallery figure{grid-column:auto;grid-row:auto;min-width:0}#gallery .gallery img{width:100%;aspect-ratio:4/3;object-fit:cover}}
