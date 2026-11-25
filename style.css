@@ -49,3 +49,14 @@ body{background:#f5f3e9;color:#263e30}header{max-width:1440px;margin:auto;paddin
 @media(prefers-reduced-motion:reduce){#session .session-listen a{transition:none}}
 
 #session .session-listen{grid-column:1/-1} .reel-player{margin:1rem 0}.reel-player summary{cursor:pointer;background:#263e30;color:#f5f3e9;padding:1rem}.reel-player iframe{display:block;max-width:100%;border:0;margin:1rem auto}.reel-player:not([open]) iframe{display:none}
+
+/* Session: film fills the editorial whitespace beside the explanatory copy. */
+@media(min-width:701px){
+  #session h2{grid-column:1;grid-row:2/4}
+  #session .session-intro{grid-column:2;grid-row:2}
+  #session .columns{grid-column:2;grid-row:3/5}
+  #session>.session-listen{grid-column:1;grid-row:4;min-width:0;max-width:540px}
+}
+#session>.session-listen{min-width:0}
+#session .reel-player summary:focus-visible{outline:3px solid #9d6c20;outline-offset:4px}
+#session .reel-mount{max-width:540px;margin-inline:auto}
