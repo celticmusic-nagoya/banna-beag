@@ -11,10 +11,16 @@ async def main():
         async with async_playwright() as p:
             browser=await p.chromium.launch(headless=False)
             page=await browser.new_page(viewport={"width":1920,"height":1080})
-            await page.goto(URL,wait_until="domcontentloaded",timeout=45000)
+            report["stage"]="navigation"
+            response=await page.goto(URL,wait_until="domcontentloaded",timeout=45000)
+            report["http_status"]=response.status if response else None
+            report["login_redirect"]="/accounts/login" in page.url
+            report["stage"]="video_detection"
             video=page.locator("video:visible").first
             await video.wait_for(timeout=20000)
-            await video.click(timeout=5000)
+            report["stage"]="playback"
+            if await video.evaluate("(v)=>v.paused"): await video.click(timeout=5000)
+            report["stage"]="capture"
             previous=-1
             for i in range(16):
                 await page.wait_for_timeout(1500)
@@ -38,6 +44,6 @@ async def main():
         report["error_type"]=type(e).__name__
     finally:
         (OUT/"manifest.json").write_text(json.dumps(report,indent=2))
-        print(json.dumps({"status":report["status"],"count":len(report["frames"])}))
+        print(json.dumps({k:v for k,v in report.items() if k!="frames"} | {"count":len(report["frames"])}))
     if report["status"]=="BLOCKED": raise SystemExit(1)
 asyncio.run(main())
