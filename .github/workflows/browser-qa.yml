@@ -128,7 +128,7 @@ jobs:
                 await page.locator('.reel-player summary').click();
                 assert.equal(await page.locator('.reel-mount blockquote.instagram-media').count(),1);
                 assert.equal(await page.locator('.reel-mount blockquote').getAttribute('data-instgrm-version'),'14');
-                await page.locator('script[src="https://www.instagram.com/embed.js"]').waitFor();
+                await page.locator('script[src="https://www.instagram.com/embed.js"]').waitFor({state:"attached"});
               }
               assert.equal(errors.length,0);
               await page.screenshot({path:'screenshots/home-'+width+'.png',fullPage:true});
