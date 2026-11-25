@@ -29,10 +29,19 @@ jobs:
           report={'official_post':official,'status':'NO_DIRECT_SOURCE'}
           url=os.environ.get('SOURCE_URL','').strip()
           token=os.environ.get('INSTAGRAM_ACCESS_TOKEN','').strip()
+          if token:
+              # Never print token, prefix, length, or hash.
+              malformed=any(c.isspace() for c in token) or token.startswith(('"',"'")) or token.endswith(('"',"'")) or token.lower().startswith('bearer ') or '://' in token
+              print('Secret format:', 'INVALID_WRAPPER' if malformed else 'OPAQUE_TOKEN')
+              if malformed:
+                  report['status']='TOKEN_FORMAT_INVALID'
+                  Path('candidates/source.json').write_text(json.dumps(report,indent=2))
+                  raise SystemExit(0)
           if not url and token:
               report['status']='TARGET_NOT_FOUND'
               endpoint='https://graph.instagram.com/v25.0/me/media'
               # Unified login may issue a Facebook Graph-compatible token.
+              authenticated=False
               for host in ('graph.instagram.com','graph.facebook.com'):
                   try:
                       probe=urllib.request.Request('https://'+host+'/v25.0/17841462940741422?fields=id,username',headers={'Authorization':'Bearer '+token})
@@ -41,12 +50,18 @@ jobs:
                       matched=identity.get('username','').lower()=='nagoya_irish'
                       print('Identity probe:',host,'MATCH' if matched else 'MISMATCH')
                       if matched:
+                          authenticated=True
                           endpoint='https://'+host+'/v25.0/17841462940741422/media'
                           break
                   except urllib.error.HTTPError as e:
                       print('Identity probe:',host,e.code)
                   except Exception as e:
                       print('Identity probe:',host,type(e).__name__)
+              if not authenticated:
+                  report['status']='IDENTITY_NOT_VERIFIED'
+                  Path('candidates/source.json').write_text(json.dumps(report,indent=2))
+                  print('Acquisition status:',report['status'])
+                  raise SystemExit(0)
               params={'fields':'id,media_type,media_url,permalink','limit':50}
               try:
                   for _ in range(20):
