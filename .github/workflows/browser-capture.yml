@@ -1,9 +1,5 @@
 name: Method C browser capture
 on:
-  pull_request:
-    paths:
-      - 'scripts/browser_capture.py'
-      - '.github/workflows/browser-capture.yml'
   workflow_dispatch:
 permissions:
   contents: read
