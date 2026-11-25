@@ -32,6 +32,21 @@ jobs:
           if not url and token:
               report['status']='TARGET_NOT_FOUND'
               endpoint='https://graph.instagram.com/v25.0/me/media'
+              # Unified login may issue a Facebook Graph-compatible token.
+              for host in ('graph.instagram.com','graph.facebook.com'):
+                  try:
+                      probe=urllib.request.Request('https://'+host+'/v25.0/17841462940741422?fields=id,username',headers={'Authorization':'Bearer '+token})
+                      with urllib.request.urlopen(probe,timeout=15) as response:
+                          identity=json.load(response)
+                      matched=identity.get('username','').lower()=='nagoya_irish'
+                      print('Identity probe:',host,'MATCH' if matched else 'MISMATCH')
+                      if matched:
+                          endpoint='https://'+host+'/v25.0/17841462940741422/media'
+                          break
+                  except urllib.error.HTTPError as e:
+                      print('Identity probe:',host,e.code)
+                  except Exception as e:
+                      print('Identity probe:',host,type(e).__name__)
               params={'fields':'id,media_type,media_url,permalink','limit':50}
               try:
                   for _ in range(20):
