@@ -122,6 +122,7 @@ jobs:
               assert.equal(await recording.getAttribute('href'),'https://www.instagram.com/reel/DbLmBXBSG2e/');
               assert.equal(await page.locator('.reel-mount').getAttribute('data-src'),'https://www.instagram.com/reel/DbLmBXBSG2e/embed/');
               assert.equal(await page.locator('.reel-player iframe').count(),0);
+              assert.equal(await page.locator('script[src="https://www.instagram.com/embed.js"]').count(),0);
               assert.equal(errors.length,0);
               await page.screenshot({path:'screenshots/home-'+width+'.png',fullPage:true});
               await page.close();
