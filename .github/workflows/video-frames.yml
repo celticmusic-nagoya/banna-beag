@@ -1,8 +1,5 @@
 name: Official video frame candidates
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/video-frames.yml'
   workflow_dispatch:
     inputs:
       source_url:
