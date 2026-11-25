@@ -47,3 +47,5 @@ body{background:#f5f3e9;color:#263e30}header{max-width:1440px;margin:auto;paddin
 #session .session-listen a:hover h3{text-decoration:underline;text-underline-offset:.2em}
 #session .session-listen img{border-radius:2px}
 @media(prefers-reduced-motion:reduce){#session .session-listen a{transition:none}}
+
+#session .session-listen{grid-column:1/-1} .reel-player{margin:1rem 0}.reel-player summary{cursor:pointer;background:#263e30;color:#f5f3e9;padding:1rem}.reel-player iframe{display:block;max-width:100%;border:0;margin:1rem auto}.reel-player:not([open]) iframe{display:none}
