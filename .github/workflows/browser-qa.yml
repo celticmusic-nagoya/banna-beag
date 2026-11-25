@@ -81,6 +81,10 @@ jobs:
               await page.locator('#gallery').scrollIntoViewIfNeeded();
               await page.locator('#gallery img').evaluateAll(imgs=>Promise.all(imgs.map(i=>{i.loading='eager';return i.decode()})));
               assert.equal(await page.locator('#gallery img').count(),4);
+              const recording=page.locator('#session .session-listen a');
+              assert.equal(await recording.count(),1);
+              assert.equal(await recording.getAttribute('href'),'https://www.youtube.com/watch?v=06sAeyREbvc');
+              assert(await recording.locator('img').evaluate(async i=>{i.loading='eager';await i.decode();return i.naturalWidth>0}));
               assert.equal(errors.length,0);
               await page.screenshot({path:'screenshots/home-'+width+'.png',fullPage:true});
               await page.close();
@@ -101,6 +105,25 @@ jobs:
           cp assets/*.webp release/assets/
           cd release
           sha256sum index.html style.css robots.txt sitemap.xml christmas-2026.webp assets/*.webp > SHA256SUMS.txt
+      - name: Verify release integrity
+        run: |
+          cd release
+          sha256sum -c SHA256SUMS.txt
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urlsplit
+          class Check(HTMLParser):
+              def handle_starttag(self, tag, attrs):
+                  a=dict(attrs)
+                  for key in ('src','href'):
+                      value=a.get(key,'')
+                      u=urlsplit(value)
+                      if not value or u.scheme or u.netloc or not u.path or u.path.startswith('/'):
+                          continue
+                      assert Path(u.path).is_file(), value
+          Check().feed(Path('index.html').read_text())
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: release-candidate
