@@ -64,3 +64,5 @@ body{background:#f5f3e9;color:#263e30}header{max-width:1440px;margin:auto;paddin
 /* Defer large, below-the-fold gallery layout without hiding it from accessibility/SEO. */
 #gallery{content-visibility:auto;contain-intrinsic-size:auto 1050px}
 @media(max-width:700px){#gallery{contain-intrinsic-size:auto 1600px}}
+
+.community-invite{max-width:620px;margin:2rem auto;padding:clamp(1.25rem,4vw,2.5rem);background:#263e30;color:#f5f3e9;border-radius:4px;text-align:left}.community-invite h3{font-size:clamp(1.1rem,2.5vw,1.5rem);line-height:1.5}.community-invite .eyebrow{color:#dce3c5}.community-cta{display:inline-block;background:#f5f3e9;color:#263e30;padding:1rem 1.25rem;font-weight:700;text-decoration:none;border-radius:2px;max-width:100%;overflow-wrap:anywhere}.community-cta:focus-visible{outline:3px solid #d8ac65;outline-offset:4px}
