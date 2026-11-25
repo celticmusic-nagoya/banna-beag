@@ -1,9 +1,5 @@
 name: Official video frame extraction
 on:
-  pull_request:
-    paths:
-      - 'scripts/extract_video_frames.py'
-      - '.github/workflows/video-frame-review.yml'
   workflow_dispatch:
 permissions:
   contents: read
