@@ -123,6 +123,13 @@ jobs:
               assert.equal(await page.locator('.reel-mount').getAttribute('data-src'),'https://www.instagram.com/reel/DbLmBXBSG2e/embed/');
               assert.equal(await page.locator('.reel-player iframe').count(),0);
               assert.equal(await page.locator('script[src="https://www.instagram.com/embed.js"]').count(),0);
+              if(width===390){
+                await page.route('https://www.instagram.com/embed.js',route=>route.fulfill({status:200,contentType:'application/javascript',body:'window.instgrm={Embeds:{process:()=>{}}};'}));
+                await page.locator('.reel-player summary').click();
+                assert.equal(await page.locator('.reel-mount blockquote.instagram-media').count(),1);
+                assert.equal(await page.locator('.reel-mount blockquote').getAttribute('data-instgrm-version'),'14');
+                await page.locator('script[src="https://www.instagram.com/embed.js"]').waitFor();
+              }
               assert.equal(errors.length,0);
               await page.screenshot({path:'screenshots/home-'+width+'.png',fullPage:true});
               await page.close();
