@@ -121,7 +121,11 @@ jobs:
                       u=urlsplit(value)
                       if not value or u.scheme or u.netloc or not u.path or u.path.startswith('/'):
                           continue
-                      assert Path(u.path).is_file(), value
+                      target=Path(u.path).resolve()
+                      assert target.is_relative_to(Path.cwd()), value
+                      if target.is_dir():
+                          target=target/'index.html'
+                      assert target.is_file(), value
           Check().feed(Path('index.html').read_text())
           PY
       - uses: actions/upload-artifact@v4
