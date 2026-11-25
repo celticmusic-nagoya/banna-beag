@@ -39,6 +39,23 @@ jobs:
           run-id: ${{ inputs.qa_run_id }}
           github-token: ${{ github.token }}
           path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: lighthouse-report
+          run-id: ${{ inputs.qa_run_id }}
+          github-token: ${{ github.token }}
+          path: lighthouse
+      - name: Enforce quality thresholds
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          categories=json.loads(Path('lighthouse/mobile.json').read_text())['categories']
+          for key, minimum in {'performance':90,'accessibility':95,'best-practices':95,'seo':95}.items():
+              score=categories[key]['score']*100
+              print(key, score, minimum)
+              assert score >= minimum, f'{key}: below release threshold'
+          PY
       - name: Verify release
         run: |
           cd release
