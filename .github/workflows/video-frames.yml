@@ -44,6 +44,13 @@ jobs:
                   report['official_post_access']=type(e).__name__
           Path('candidates/source.json').write_text(json.dumps(report,indent=2))
           PY
+      - name: Install FFmpeg when missing
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version
       - name: Verify extraction engine with isolated synthetic test
         run: |
           mkdir -p /tmp/frame-test
@@ -61,6 +68,7 @@ jobs:
             echo 'No authorized direct video file available; no frames fabricated.'
           fi
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: private-review-frame-candidates
           path: candidates/
