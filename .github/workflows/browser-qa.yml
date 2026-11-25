@@ -124,6 +124,13 @@ jobs:
               assert(await page.evaluate(async()=>{const i=new Image();i.src='assets/hero-session-mobile.webp';await i.decode();return i.naturalWidth>0}));
               for(const id of ['about','session','events','join'])assert.equal(await page.locator('#'+id).count(),1);
               assert.equal(await page.locator('time').count(),2);
+              const line=page.locator('#join .community-cta');
+              assert.equal(await line.count(),1);
+              assert.equal(await line.getAttribute('href'),'https://line.me/ti/g2/w4f70aZwdCtmUFRIo81Z3ZS6LD4WxnLw9zzJ0Q?utm_source=invitation&utm_medium=link_copy&utm_campaign=default');
+              assert.equal(await line.getAttribute('target'),'_blank');
+              await line.scrollIntoViewIfNeeded();
+              assert(await line.isVisible());
+              assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
               assert(await page.locator('.event-poster img').evaluate(async i=>{i.loading='eager';await i.decode();return i.naturalWidth>0}));
               await page.locator('#gallery').scrollIntoViewIfNeeded();
               await page.locator('#gallery img').evaluateAll(imgs=>Promise.all(imgs.map(i=>{i.loading='eager';return i.decode()})));
