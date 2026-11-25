@@ -19,14 +19,45 @@ jobs:
       - name: Inspect official source and obtain authorized video
         env:
           SOURCE_URL: ${{ inputs.source_url }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
         run: |
           mkdir -p candidates
           python3 - <<'PY'
-          import json, os, urllib.request, urllib.parse
+          import json, os, urllib.request, urllib.parse, urllib.error
           from pathlib import Path
           official='https://www.instagram.com/reel/DbLmBXBSG2e/'
           report={'official_post':official,'status':'NO_DIRECT_SOURCE'}
           url=os.environ.get('SOURCE_URL','').strip()
+          token=os.environ.get('INSTAGRAM_ACCESS_TOKEN','').strip()
+          if not url and token:
+              report['status']='TARGET_NOT_FOUND'
+              endpoint='https://graph.instagram.com/v25.0/me/media'
+              params={'fields':'id,media_type,media_url,permalink','limit':50}
+              try:
+                  for _ in range(20):
+                      request=urllib.request.Request(endpoint+'?'+urllib.parse.urlencode(params),headers={'Authorization':'Bearer '+token})
+                      with urllib.request.urlopen(request,timeout=20) as response:
+                          page=json.load(response)
+                      for item in page.get('data',[]):
+                          if urllib.parse.urlsplit(item.get('permalink','')).path.rstrip('/') == '/reel/DbLmBXBSG2e':
+                              report['media_id']=item['id']
+                              if item.get('media_type')=='VIDEO' and item.get('media_url'):
+                                  url=item['media_url']
+                              else:
+                                  report['status']='MEDIA_URL_UNAVAILABLE'
+                              break
+                      if url or 'media_id' in report: break
+                      cursor=page.get('paging',{}).get('cursors',{}).get('after')
+                      if not cursor or not page.get('paging',{}).get('next'): break
+                      params['after']=cursor
+              except urllib.error.HTTPError as e:
+                  report['status']='API_HTTP_ERROR'
+                  report['http_status']=e.code
+              except Exception as e:
+                  report['status']='API_ERROR'
+                  report['error_type']=type(e).__name__
+          elif not url:
+              report['status']='TOKEN_MISSING'
           if url:
               u=urllib.parse.urlsplit(url)
               assert u.scheme=='https' and u.hostname and not u.username and not u.password
@@ -36,13 +67,8 @@ jobs:
                   assert len(data)<=80*1024*1024
               Path('source-video').write_bytes(data)
               report['status']='VIDEO_ACQUIRED'
-          else:
-              try:
-                  with urllib.request.urlopen(official,timeout=20) as response:
-                      report['official_post_http']=response.status
-              except Exception as e:
-                  report['official_post_access']=type(e).__name__
           Path('candidates/source.json').write_text(json.dumps(report,indent=2))
+          print('Acquisition status:',report['status'])
           PY
       - name: Install FFmpeg when missing
         run: |
