@@ -134,8 +134,11 @@ jobs:
               assert(await page.locator('.event-poster img').evaluate(async i=>{i.loading='eager';await i.decode();return i.naturalWidth>0}));
               await page.locator('#gallery').scrollIntoViewIfNeeded();
               await page.locator('#gallery img').evaluateAll(imgs=>Promise.all(imgs.map(i=>{i.loading='eager';return i.decode()})));
-              assert.equal(await page.locator('#gallery img').count(),4);
-              if(width<=700)assert.equal(await page.locator('#gallery figure:nth-child(2) img').evaluate(img=>img.currentSrc.split('/').pop()),'street-performance-small.webp');
+              assert.equal(await page.locator('#gallery img').count(),3);
+              await page.locator('#session .session-visual img').evaluate(i=>{i.loading='eager';return i.decode()});
+              assert.equal(await page.locator('#session .session-visual img').count(),1);
+              assert.equal(await page.locator('#gallery img[src="assets/street-performance.webp"]').count(),0);
+              if(width<=700)assert.equal(await page.locator('#session .session-visual img').evaluate(img=>img.currentSrc.split('/').pop()),'street-performance-small.webp');
               const recording=page.locator('#session .session-listen a');
               assert.equal(await recording.count(),1);
               assert.equal(await recording.getAttribute('href'),'https://www.instagram.com/reel/DbLmBXBSG2e/');
