@@ -60,3 +60,7 @@ body{background:#f5f3e9;color:#263e30}header{max-width:1440px;margin:auto;paddin
 #session>.session-listen{min-width:0}
 #session .reel-player summary:focus-visible{outline:3px solid #9d6c20;outline-offset:4px}
 #session .reel-mount{max-width:540px;margin-inline:auto}
+
+/* Defer large, below-the-fold gallery layout without hiding it from accessibility/SEO. */
+#gallery{content-visibility:auto;contain-intrinsic-size:auto 1050px}
+@media(max-width:700px){#gallery{contain-intrinsic-size:auto 1600px}}
