@@ -53,6 +53,12 @@ jobs:
               except urllib.error.HTTPError as e:
                   report['status']='API_HTTP_ERROR'
                   report['http_status']=e.code
+                  try:
+                      error=json.load(e).get('error',{})
+                      for key in ('code','error_subcode','type'):
+                          if key in error: report['api_'+key]=error[key]
+                  except Exception: pass
+                  print('API diagnostic:',json.dumps({k:v for k,v in report.items() if k.startswith('api_') or k=='http_status'}))
               except Exception as e:
                   report['status']='API_ERROR'
                   report['error_type']=type(e).__name__
