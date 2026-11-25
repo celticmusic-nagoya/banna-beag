@@ -1,0 +1,60 @@
+name: Official video frame candidates
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/video-frames.yml'
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: 'Authorized direct HTTPS video file URL (not a social post)'
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  frames:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Inspect official source and obtain authorized video
+        env:
+          SOURCE_URL: ${{ inputs.source_url }}
+        run: |
+          mkdir -p candidates
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.parse
+          from pathlib import Path
+          official='https://www.instagram.com/reel/DbLmBXBSG2e/'
+          report={'official_post':official,'status':'NO_DIRECT_SOURCE'}
+          url=os.environ.get('SOURCE_URL','').strip()
+          if url:
+              u=urllib.parse.urlsplit(url)
+              assert u.scheme=='https' and u.hostname and not u.username and not u.password
+              with urllib.request.urlopen(url,timeout=30) as response:
+                  assert response.headers.get_content_type().startswith('video/'), 'Expected authorized video file'
+                  data=response.read(80*1024*1024+1)
+                  assert len(data)<=80*1024*1024
+              Path('source-video').write_bytes(data)
+              report['status']='VIDEO_ACQUIRED'
+          else:
+              try:
+                  with urllib.request.urlopen(official,timeout=20) as response:
+                      report['official_post_http']=response.status
+              except Exception as e:
+                  report['official_post_access']=type(e).__name__
+          Path('candidates/source.json').write_text(json.dumps(report,indent=2))
+          PY
+      - name: Extract review frames
+        run: |
+          if [ -f source-video ]; then
+            ffmpeg -nostdin -v error -i source-video -vf 'fps=1/3,scale=1280:-2' -frames:v 24 -q:v 3 candidates/frame-%03d.jpg
+            sha256sum source-video > candidates/source.sha256
+            sha256sum candidates/*.jpg > candidates/frames.sha256
+          else
+            echo 'No authorized direct video file available; no frames fabricated.'
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: private-review-frame-candidates
+          path: candidates/
+          retention-days: 3
