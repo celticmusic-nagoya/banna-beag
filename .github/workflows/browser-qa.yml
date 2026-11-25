@@ -47,6 +47,40 @@ jobs:
           p=Path('index.html')
           p.write_text(p.read_text().replace('<link rel="preload" as="image" href="assets/hero-session.webp" fetchpriority="high">','<link rel="preload" as="image" href="assets/hero-session.webp" media="(min-width:701px)" fetchpriority="high"><link rel="preload" as="image" href="assets/hero-session-mobile.webp" media="(max-width:700px)" fetchpriority="high">'))
           PY
+      - name: Generate responsive community and event imagery
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          html_path = Path('index.html')
+          html = html_path.read_text()
+          for name in ('community', 'street-performance', 'festival', 'outdoor-community'):
+              source = Path('assets') / (name + '.webp')
+              output = Path('assets') / (name + '-small.webp')
+              with Image.open(source) as image:
+                  original_width = image.width
+                  image.thumbnail((720, 720), Image.Resampling.LANCZOS)
+                  small_width = image.width
+                  image.save(output, 'WEBP', quality=68, method=6)
+              src = 'src="assets/' + name + '.webp"'
+              responsive = (' srcset="assets/' + name + '-small.webp ' + str(small_width) +
+                            'w, assets/' + name + '.webp ' + str(original_width) +
+                            'w" sizes="(max-width:700px) calc(100vw - 48px), 520px"')
+              assert src in html, name
+              html = html.replace(src, src + responsive)
+              print(source.name, source.stat().st_size, '=>', output.name, output.stat().st_size)
+          with Image.open('christmas-2026.webp') as image:
+              image.thumbnail((760, 1200), Image.Resampling.LANCZOS)
+              image.save('christmas-2026-small.webp', 'WEBP', quality=82, method=6)
+          poster_src = 'src="christmas-2026.webp"'
+          assert poster_src in html
+          html = html.replace(poster_src, poster_src + ' srcset="christmas-2026-small.webp 760w, christmas-2026.webp 955w" sizes="(max-width:700px) min(calc(100vw - 48px), 440px), 500px"')
+          html_path.write_text(html)
+          with Image.open('assets/hero-session.webp') as image:
+              image.thumbnail((840, 840), Image.Resampling.LANCZOS)
+              image.save('assets/hero-session-mobile.webp', 'WEBP', quality=67, method=6)
+          print('mobile hero bytes', Path('assets/hero-session-mobile.webp').stat().st_size)
+          PY
       - name: Verify approved photo assets
         run: |
           python3 - <<'PY'
@@ -103,10 +137,10 @@ jobs:
       - name: Assemble release candidate without publishing
         run: |
           mkdir -p release/assets
-          cp index.html style.css robots.txt sitemap.xml christmas-2026.webp release/
+          cp index.html style.css robots.txt sitemap.xml christmas-2026*.webp release/
           cp assets/*.webp release/assets/
           cd release
-          sha256sum index.html style.css robots.txt sitemap.xml christmas-2026.webp assets/*.webp > SHA256SUMS.txt
+          sha256sum index.html style.css robots.txt sitemap.xml christmas-2026*.webp assets/*.webp > SHA256SUMS.txt
       - name: Verify release integrity
         run: |
           cd release
