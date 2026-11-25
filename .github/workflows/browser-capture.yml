@@ -1,0 +1,33 @@
+name: Method C browser capture
+on:
+  pull_request:
+    paths:
+      - 'scripts/browser_capture.py'
+      - '.github/workflows/browser-capture.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: browser-capture-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          pip install playwright==1.51.0 Pillow==11.2.1
+          python -m playwright install --with-deps chromium
+      - run: xvfb-run -a python scripts/browser_capture.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-capture-review
+          path: capture-review/manifest.json
+          retention-days: 3
