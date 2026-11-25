@@ -74,10 +74,11 @@ jobs:
                       '<picture><source media="(max-width:700px)" srcset="assets/street-performance-small.webp"><img src="assets/street-performance.webp"'
                   )
                   html = html.replace(
-                      'alt="街中での演奏風景">',
-                      'alt="街中での演奏風景"></picture>'
+                      'alt="街中でアイリッシュ音楽を演奏するBanna Beagの活動風景">',
+                      'alt="街中でアイリッシュ音楽を演奏するBanna Beagの活動風景"></picture>'
                   )
                   assert '<picture><source media="(max-width:700px)"' in html
+                  assert html.count('<picture>') == html.count('</picture>')
 
               print(source.name, source.stat().st_size, '=>', output.name, output.stat().st_size)
           with Image.open('christmas-2026.webp') as image:
