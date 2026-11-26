@@ -18,15 +18,15 @@ def process(root=Path('assets'),report_path=Path('privacy-review.json')):
         sx,sy=im.width/ref[0],im.height/ref[1]
         def scale(b): return tuple(round(v*(sx if i%2==0 else sy)) for i,v in enumerate(b))
         for b in boxes:
-            x0,y0,x1,y1=scale(b); d=min(x1-x0,y1-y0); pad=max(3,round(d*.20)); ext=pad*3
+            x0,y0,x1,y1=scale(b); d=min(x1-x0,y1-y0); pad=max(3,round(d*.20)); ext=max(pad*3,round(d*.65))
             region=(max(0,x0-ext),max(0,y0-ext),min(im.width,x1+ext),min(im.height,y1+ext))
             patch=im.crop(region); mask=Image.new('L',patch.size)
             ImageDraw.Draw(mask).ellipse((x0-region[0]-pad,y0-region[1]-pad,x1-region[0]+pad,y1-region[1]+pad),fill=255)
-            mask=mask.filter(ImageFilter.GaussianBlur(max(2,d*.09)))
-            im.paste(patch.filter(ImageFilter.GaussianBlur(max(4,d*.25))),region,mask)
+            mask=mask.filter(ImageFilter.GaussianBlur(max(2,d*.15)))
+            im.paste(patch.filter(ImageFilter.GaussianBlur(max(3,d*.18))),region,mask)
         if crop: im=im.crop(scale(crop))
         sat,contrast=GRADE[name]; im=ImageEnhance.Color(im).enhance(sat); im=ImageEnhance.Contrast(im).enhance(contrast)
         im.save(p,'WEBP',quality=84,method=6)
-        report.append(dict(file=name,regions=len(boxes),source_sha256=before,derivative_sha256=hashlib.sha256(p.read_bytes()).hexdigest(),size=list(im.size),review='manual_candidate_v4'))
+        report.append(dict(file=name,regions=len(boxes),source_sha256=before,derivative_sha256=hashlib.sha256(p.read_bytes()).hexdigest(),size=list(im.size),blur_ratio=.18,feather_ratio=.15,review='manual_candidate_v5'))
     report_path.write_text(json.dumps(report,indent=2)); print(json.dumps(report))
 if __name__=='__main__': process()
