@@ -1,27 +1,37 @@
 from pathlib import Path
-import cv2
-import json
-import hashlib
-from PIL import Image, ImageFilter
-detectors = [(cv2.CascadeClassifier(cv2.data.haarcascades + n), flip) for n, flip in [('haarcascade_frontalface_default.xml', False), ('haarcascade_profileface.xml', False), ('haarcascade_profileface.xml', True)]]
-assert all(not d.empty() for d, _ in detectors)
-report = []
-for p in sorted(Path('assets').glob('*.webp')):
-    before = hashlib.sha256(p.read_bytes()).hexdigest()
-    with Image.open(p) as source:
-        im = source.convert('RGB')
-    gray = cv2.cvtColor(cv2.imread(str(p)), cv2.COLOR_BGR2GRAY)
-    boxes = []
-    for detector, flip in detectors:
-        g = cv2.flip(gray, 1) if flip else gray
-        for x,y,w,h in detector.detectMultiScale(g, scaleFactor=1.08, minNeighbors=4, minSize=(18,18)):
-            if flip: x = im.width-x-w
-            box = (max(0,int(x-w*.18)),max(0,int(y-h*.22)),min(im.width,int(x+w*1.18)),min(im.height,int(y+h*1.22)))
-            if box not in boxes: boxes.append(box)
-    for box in boxes:
-        region = im.crop(box)
-        im.paste(region.filter(ImageFilter.GaussianBlur(max(4,region.width/7))),box)
-    if boxes: im.save(p,'WEBP',quality=88,method=6)
-    report.append(dict(file=p.name, detected=len(boxes), boxes=boxes, original_sha256=before, derivative_sha256=hashlib.sha256(p.read_bytes()).hexdigest(), review='manual_required'))
-Path('privacy-review.json').write_text(json.dumps(report,indent=2))
-print(json.dumps(report))
+import hashlib, json
+from PIL import Image, ImageDraw, ImageFilter
+# Face rectangles in the inspected reference coordinate frame, before crop.
+SPECS = {
+ 'community.webp': ((1440,1080), 'bafe57c5942f8da9cf35d02f9e2338d8252c970f8ce704736948d704ca95acdc', None, [(287,166,371,270),(242,322,356,432),(439,285,520,382),(654,324,743,428),(840,251,925,342),(1016,330,1100,426),(1205,294,1313,400)]),
+ 'festival.webp': ((1404,1056), '9ddc13f1df9aa2e1789b6003ca6f415cc3bced8766bd714e756e3a3956e4722b', None, [(151,407,230,491),(393,377,464,464),(532,370,608,451),(647,379,716,463),(814,405,877,490),(995,321,1063,416),(1175,389,1256,479),(434,602,508,693),(626,646,715,750),(827,601,907,689)]),
+ 'hero-session.webp': ((1344,1135), '190ddbb1d6cf8942c490f4d35ff458a418b42aacd7c992c978ccb277a567c717', None, [(924,307,970,359),(393,778,440,829),(510,805,554,860),(716,652,767,697),(874,647,916,701),(1084,661,1126,708),(1138,779,1190,832)]),
+ 'outdoor-community.webp': ((1600,902), 'df22893337d674f973d3e2346031d82765bf94594ba1cac6ef06f27baf52bbe3', (0,0,1265,902), [(78,336,128,391),(241,431,325,509),(269,196,313,248),(391,284,425,321),(476,235,514,273),(576,279,627,327),(811,266,861,320),(1060,324,1144,400),(1200,249,1235,291),(132,234,159,265)]),
+ 'street-performance.webp': ((1000,1500), '3cb7bfcc6dfc9dbe692eb206953ad1e2430a6e13613eb8a3964c92802ffa0614', None, [(130,583,201,683),(377,485,454,569),(509,585,557,653),(614,566,686,652),(799,601,855,657),(905,603,965,678),(69,680,115,742),(0,720,29,776),(757,709,790,744)])
+}
+
+def process(root=Path('assets'), report_path=Path('privacy-review.json')):
+    report=[]
+    for name,(reference,expected,crop,boxes) in SPECS.items():
+        p=root/name
+        before=hashlib.sha256(p.read_bytes()).hexdigest()
+        if before != expected: raise ValueError(f'Unreviewed source: {name}')
+        with Image.open(p) as source: im=source.convert('RGB')
+        sx,sy=im.width/reference[0],im.height/reference[1]
+        def scale(box): return tuple(round(v*(sx if i%2==0 else sy)) for i,v in enumerate(box))
+        for rect in boxes:
+            x0,y0,x1,y1=scale(rect); w,h=x1-x0,y1-y0
+            # Full blur inside the selected face; softly feather only the perimeter.
+            pad=max(4,round(min(w,h)*.26)); feather=max(2,pad/3)
+            region=(max(0,x0-pad),max(0,y0-pad),min(im.width,x1+pad),min(im.height,y1+pad))
+            patch=im.crop(region); mask=Image.new('L',patch.size)
+            ImageDraw.Draw(mask).ellipse((x0-region[0]-pad//2,y0-region[1]-pad//2,x1-region[0]+pad//2,y1-region[1]+pad//2),fill=255)
+            mask=mask.filter(ImageFilter.GaussianBlur(feather))
+            im.paste(patch.filter(ImageFilter.GaussianBlur(max(5,min(w,h)*.19))),region,mask)
+        if crop: im=im.crop(scale(crop))
+        im.save(p,'WEBP',quality=88,method=6)
+        report.append(dict(file=name,regions=len(boxes),source_sha256=before,derivative_sha256=hashlib.sha256(p.read_bytes()).hexdigest(),size=list(im.size),review='manual_candidate'))
+    report_path.write_text(json.dumps(report,indent=2))
+    print(json.dumps(report))
+
+if __name__=='__main__': process()
