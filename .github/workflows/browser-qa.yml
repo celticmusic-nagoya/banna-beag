@@ -28,6 +28,16 @@ jobs:
                   p.parent.mkdir(exist_ok=True)
                   p.write_bytes(z.read(matches[0]))
           PY
+      - name: Generate SHA-pinned manual photo candidates
+        run: |
+          python3 -m pip install --user Pillow==11.3.0
+          python3 scripts/privacy_photos.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: privacy-review
+          path: |
+            privacy-review.json
+            assets/*.webp
       - name: Generate mobile hero derivative
         run: |
           python3 -m pip install --user Pillow==11.3.0
@@ -74,10 +84,11 @@ jobs:
                       '<picture><source media="(max-width:700px)" srcset="assets/street-performance-small.webp"><img src="assets/street-performance.webp"'
                   )
                   html = html.replace(
-                      'alt="街中での演奏風景">',
-                      'alt="街中での演奏風景"></picture>'
+                      'alt="街中でアイリッシュ音楽を演奏するBanna Beagの活動風景">',
+                      'alt="街中でアイリッシュ音楽を演奏するBanna Beagの活動風景"></picture>'
                   )
                   assert '<picture><source media="(max-width:700px)"' in html
+                  assert html.count('<picture>') == html.count('</picture>')
 
               print(source.name, source.stat().st_size, '=>', output.name, output.stat().st_size)
           with Image.open('christmas-2026.webp') as image:
@@ -124,11 +135,21 @@ jobs:
               assert(await page.evaluate(async()=>{const i=new Image();i.src='assets/hero-session-mobile.webp';await i.decode();return i.naturalWidth>0}));
               for(const id of ['about','session','events','join'])assert.equal(await page.locator('#'+id).count(),1);
               assert.equal(await page.locator('time').count(),2);
+              const line=page.locator('#join .community-cta');
+              assert.equal(await line.count(),1);
+              assert.equal(await line.getAttribute('href'),'https://line.me/ti/g2/w4f70aZwdCtmUFRIo81Z3ZS6LD4WxnLw9zzJ0Q?utm_source=invitation&utm_medium=link_copy&utm_campaign=default');
+              assert.equal(await line.getAttribute('target'),'_blank');
+              await line.scrollIntoViewIfNeeded();
+              assert(await line.isVisible());
+              assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
               assert(await page.locator('.event-poster img').evaluate(async i=>{i.loading='eager';await i.decode();return i.naturalWidth>0}));
               await page.locator('#gallery').scrollIntoViewIfNeeded();
               await page.locator('#gallery img').evaluateAll(imgs=>Promise.all(imgs.map(i=>{i.loading='eager';return i.decode()})));
-              assert.equal(await page.locator('#gallery img').count(),4);
-              if(width<=700)assert.equal(await page.locator('#gallery figure:nth-child(2) img').evaluate(img=>img.currentSrc.split('/').pop()),'street-performance-small.webp');
+              assert.equal(await page.locator('#gallery img').count(),3);
+              await page.locator('#session .session-visual img').evaluate(i=>{i.loading='eager';return i.decode()});
+              assert.equal(await page.locator('#session .session-visual img').count(),1);
+              assert.equal(await page.locator('#gallery img[src="assets/street-performance.webp"]').count(),0);
+              if(width<=700)assert.equal(await page.locator('#session .session-visual img').evaluate(img=>img.currentSrc.split('/').pop()),'street-performance-small.webp');
               const recording=page.locator('#session .session-listen a');
               assert.equal(await recording.count(),1);
               assert.equal(await recording.getAttribute('href'),'https://www.instagram.com/reel/DbLmBXBSG2e/');

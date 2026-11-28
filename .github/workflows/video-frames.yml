@@ -1,0 +1,134 @@
+name: Official video frame candidates
+on:
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: 'Authorized direct HTTPS video file URL (not a social post)'
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  frames:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Inspect official source and obtain authorized video
+        env:
+          SOURCE_URL: ${{ inputs.source_url }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+        run: |
+          mkdir -p candidates
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.parse, urllib.error
+          from pathlib import Path
+          official='https://www.instagram.com/reel/DbLmBXBSG2e/'
+          report={'official_post':official,'status':'NO_DIRECT_SOURCE'}
+          url=os.environ.get('SOURCE_URL','').strip()
+          token=os.environ.get('INSTAGRAM_ACCESS_TOKEN','').strip()
+          if token:
+              # Never print token, prefix, length, or hash.
+              malformed=any(c.isspace() for c in token) or token.startswith(('"',"'")) or token.endswith(('"',"'")) or token.lower().startswith('bearer ') or '://' in token
+              print('Secret format:', 'INVALID_WRAPPER' if malformed else 'OPAQUE_TOKEN')
+              if malformed:
+                  report['status']='TOKEN_FORMAT_INVALID'
+                  Path('candidates/source.json').write_text(json.dumps(report,indent=2))
+                  raise SystemExit(0)
+          if not url and token:
+              report['status']='TARGET_NOT_FOUND'
+              endpoint='https://graph.instagram.com/v25.0/me/media'
+              # Unified login may issue a Facebook Graph-compatible token.
+              authenticated=False
+              for host in ('graph.instagram.com','graph.facebook.com'):
+                  try:
+                      probe=urllib.request.Request('https://'+host+'/v25.0/17841462940741422?fields=id,username',headers={'Authorization':'Bearer '+token})
+                      with urllib.request.urlopen(probe,timeout=15) as response:
+                          identity=json.load(response)
+                      matched=identity.get('username','').lower()=='nagoya_irish'
+                      print('Identity probe:',host,'MATCH' if matched else 'MISMATCH')
+                      if matched:
+                          authenticated=True
+                          endpoint='https://'+host+'/v25.0/17841462940741422/media'
+                          break
+                  except urllib.error.HTTPError as e:
+                      print('Identity probe:',host,e.code)
+                  except Exception as e:
+                      print('Identity probe:',host,type(e).__name__)
+              if not authenticated:
+                  report['status']='IDENTITY_NOT_VERIFIED'
+                  Path('candidates/source.json').write_text(json.dumps(report,indent=2))
+                  print('Acquisition status:',report['status'])
+                  raise SystemExit(0)
+              params={'fields':'id,media_type,media_url,permalink','limit':50}
+              try:
+                  for _ in range(20):
+                      request=urllib.request.Request(endpoint+'?'+urllib.parse.urlencode(params),headers={'Authorization':'Bearer '+token})
+                      with urllib.request.urlopen(request,timeout=20) as response:
+                          page=json.load(response)
+                      for item in page.get('data',[]):
+                          if urllib.parse.urlsplit(item.get('permalink','')).path.rstrip('/') == '/reel/DbLmBXBSG2e':
+                              report['media_id']=item['id']
+                              if item.get('media_type')=='VIDEO' and item.get('media_url'):
+                                  url=item['media_url']
+                              else:
+                                  report['status']='MEDIA_URL_UNAVAILABLE'
+                              break
+                      if url or 'media_id' in report: break
+                      cursor=page.get('paging',{}).get('cursors',{}).get('after')
+                      if not cursor or not page.get('paging',{}).get('next'): break
+                      params['after']=cursor
+              except urllib.error.HTTPError as e:
+                  report['status']='API_HTTP_ERROR'
+                  report['http_status']=e.code
+                  try:
+                      error=json.load(e).get('error',{})
+                      for key in ('code','error_subcode','type'):
+                          if key in error: report['api_'+key]=error[key]
+                  except Exception: pass
+                  print('API diagnostic:',json.dumps({k:v for k,v in report.items() if k.startswith('api_') or k=='http_status'}))
+              except Exception as e:
+                  report['status']='API_ERROR'
+                  report['error_type']=type(e).__name__
+          elif not url:
+              report['status']='TOKEN_MISSING'
+          if url:
+              u=urllib.parse.urlsplit(url)
+              assert u.scheme=='https' and u.hostname and not u.username and not u.password
+              with urllib.request.urlopen(url,timeout=30) as response:
+                  assert response.headers.get_content_type().startswith('video/'), 'Expected authorized video file'
+                  data=response.read(80*1024*1024+1)
+                  assert len(data)<=80*1024*1024
+              Path('source-video').write_bytes(data)
+              report['status']='VIDEO_ACQUIRED'
+          Path('candidates/source.json').write_text(json.dumps(report,indent=2))
+          print('Acquisition status:',report['status'])
+          PY
+      - name: Install FFmpeg when missing
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version
+      - name: Verify extraction engine with isolated synthetic test
+        run: |
+          mkdir -p /tmp/frame-test
+          ffmpeg -nostdin -v error -f lavfi -i testsrc2=size=640x360:rate=24 -t 7 -c:v mpeg4 /tmp/frame-test/test.mp4
+          ffmpeg -nostdin -v error -i /tmp/frame-test/test.mp4 -vf 'fps=1/3,scale=1280:-2' -frames:v 24 -q:v 3 /tmp/frame-test/frame-%03d.jpg
+          test "$(find /tmp/frame-test -name 'frame-*.jpg' | wc -l)" -ge 2
+          rm -rf /tmp/frame-test
+      - name: Extract review frames
+        run: |
+          if [ -f source-video ]; then
+            ffmpeg -nostdin -v error -i source-video -vf 'fps=1/3,scale=1280:-2' -frames:v 24 -q:v 3 candidates/frame-%03d.jpg
+            sha256sum source-video > candidates/source.sha256
+            sha256sum candidates/*.jpg > candidates/frames.sha256
+          else
+            echo 'No authorized direct video file available; no frames fabricated.'
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: private-review-frame-candidates
+          path: candidates/
+          retention-days: 3
